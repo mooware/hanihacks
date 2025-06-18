@@ -8,7 +8,12 @@ ORIG_ROM_SHA1 = '1ddde747140bd3887bc7f4a432a22f13bd52c3a3'
 # there is also a big block of 0xFF following it which can probably be used.
 CREDITS_TEXT_START = 0x33300
 
-# stage names at 0x53f9?
+# intro textbox: 12x6 chars
+# stage name: 10 chars
+STAGE_NAMES_RANGE = (0x53f9, 0x550d)
+# there are a few non-text bytes in-between these ranges
+TEXTBOXES_RANGES = [(210761, 211463), (211520, 212981)]
+
 # big block of 0xFF at ~0x6430?
 # character tiles around 0x11cc0?
 # 72746 is note char, 72790 is "dollar", 73274 is "K"
@@ -48,19 +53,15 @@ CHARACTER_MAP = (
 
 REVERSE_MAP = dict([(c, i) for (i, c) in enumerate(CHARACTER_MAP)])
 
-# intro textbox: 12x6 chars
-# stage name: 10 chars
-STAGE_NAMES_RANGE = (0x53f9, 0x550d)
-TEXTBOXES_RANGES = [(210761, 211463), (211520, 212981)] # there are a few non-text bytes in-between
-
+# get a full 256 byte character translation table for rom -> text
 def get_translation_table():
     full_map = CHARACTER_MAP.ljust(256, CHARACTER_MAP[190])
     table = list(full_map)
     table[0xFC] = '\n'
     return table
 
-# extract and map stage names, each one is terminated by 0xFF
-def extract_texts(data, start, end):
+# extract and map texts from the given byte range, each one is terminated by 0xFF
+def extract_text_range(data, start, end):
     result = []
     tbl = get_translation_table()
     pos = start
@@ -73,6 +74,14 @@ def extract_texts(data, start, end):
         result.append({'start': pos, 'end': separator, 'text': mapped_text})
         pos = separator + 1
     return result
+
+# get all relevant texts from the rom
+def extract_all_texts(data):
+    texts = []
+    texts.extend(extract_text_range(data, *STAGE_NAMES_RANGE))
+    for r in TEXTBOXES_RANGES:
+        texts.extend(extract_text_range(data, *r))
+    return texts
 
 # decode an 8x8 PC Engine tile, description from here: https://www.chibiakumas.com/6502/pcengine.php
 def decode_tile(data):
